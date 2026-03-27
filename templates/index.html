@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Braille to Speech Translator</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    body {
+      background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.7)),
+        url("https://www.pathstoliteracy.org/wp-content/uploads/2022/05/braille_hand_movement.png")
+        no-repeat center center fixed;
+      background-size: cover;
+      font-family: 'Poppins', sans-serif;
+    }
+
+    .glass {
+      backdrop-filter: blur(15px);
+      background: rgba(255, 255, 255, 0.15);
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+
+    .fade-in {
+      animation: fadeIn 0.6s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(15px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+
+<body class="min-h-screen flex items-center justify-center text-white">
+
+  <div class="glass shadow-2xl rounded-3xl p-8 w-full max-w-xl text-center fade-in">
+
+    <!-- Title -->
+    <h1 class="text-3xl font-bold mb-2 text-indigo-300">
+      🔠 Braille Translator
+    </h1>
+    <p class="text-gray-200 mb-6 text-sm">
+      Convert Braille images → Text → Translate → Speech
+    </p>
+
+    <!-- Upload -->
+    <form id="uploadForm" class="space-y-4">
+      <input type="file" id="fileInput" name="file" accept="image/*"
+        class="w-full p-3 rounded-xl bg-white/20 border border-white/30 text-white"/>
+
+      <button type="submit"
+        class="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:scale-105 transition transform text-white py-3 rounded-xl font-semibold shadow-lg">
+        🚀 Convert to Text
+      </button>
+    </form>
+
+    <!-- Results -->
+    <div id="resultSection" class="hidden mt-6 text-left fade-in">
+      <label class="font-semibold">Detected Text</label>
+      <textarea id="detectedText"
+        class="w-full h-24 p-3 mt-2 rounded-xl bg-white/20 border border-white/30 text-white"
+        readonly></textarea>
+
+      <label class="block mt-4 font-semibold">Translate to</label>
+      <select id="languageSelect"
+        class="w-full p-3 mt-1 rounded-xl bg-white/20 border border-white/30 text-white">
+        {% for code, name in languages.items() %}
+          <option value="{{ code }}" class="text-black">{{ name }}</option>
+        {% endfor %}
+      </select>
+
+      <div class="flex gap-3 mt-5">
+        <button id="translateSpeak"
+          class="flex-1 bg-green-500 hover:bg-green-600 transition py-2 rounded-xl font-semibold shadow-md">
+          🔊 Speak
+        </button>
+
+        <button id="clearBtn"
+          class="flex-1 bg-red-400 hover:bg-red-500 transition py-2 rounded-xl font-semibold shadow-md">
+          ❌ Clear
+        </button>
+      </div>
+
+      <!-- Translated -->
+      <div id="translatedSection" class="hidden mt-6 fade-in">
+        <label class="font-semibold">Translated Text</label>
+        <textarea id="translatedText"
+          class="w-full h-24 p-3 mt-2 rounded-xl bg-white/20 border border-white/30 text-white"
+          readonly></textarea>
+
+        <audio id="audioPlayer" controls
+          class="w-full mt-4 hidden rounded-lg"></audio>
+      </div>
+    </div>
+  </div>
+
+  <!-- JS -->
+  <script>
+    const uploadForm = document.getElementById('uploadForm');
+    const fileInput = document.getElementById('fileInput');
+    const resultSection = document.getElementById('resultSection');
+    const detectedText = document.getElementById('detectedText');
+    const translatedSection = document.getElementById('translatedSection');
+    const translatedText = document.getElementById('translatedText');
+    const languageSelect = document.getElementById('languageSelect');
+    const audioPlayer = document.getElementById('audioPlayer');
+
+    const translateSpeakBtn = document.getElementById('translateSpeak');
+    const clearBtn = document.getElementById('clearBtn');
+
+    uploadForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const file = fileInput.files[0];
+      if (!file) {
+        alert("Please select an image file first.");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch('/digest', { method: 'POST', body: formData });
+      const data = await res.json();
+
+      if (data.error) {
+        alert("Error: " + data.message);
+        return;
+      }
+
+      resultSection.classList.remove('hidden');
+      detectedText.value = data.digest;
+    });
+
+    translateSpeakBtn.addEventListener('click', async () => {
+      const text = detectedText.value.trim();
+      if (!text) {
+        alert("No text detected.");
+        return;
+      }
+
+      const lang = languageSelect.value;
+
+      const res = await fetch('/speech', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, language: lang })
+      });
+
+      const data = await res.json();
+
+      if (data.error) {
+        alert("Error: " + data.message);
+        return;
+      }
+
+      translatedSection.classList.remove('hidden');
+      translatedText.value = data.translated;
+
+      audioPlayer.src = data.audio_url;
+      audioPlayer.classList.remove('hidden');
+      audioPlayer.play();
+    });
+
+    clearBtn.addEventListener('click', () => {
+      fileInput.value = "";
+      detectedText.value = "";
+      translatedText.value = "";
+      resultSection.classList.add('hidden');
+      translatedSection.classList.add('hidden');
+      audioPlayer.classList.add('hidden');
+    });
+  </script>
+
+</body>
+</html>
